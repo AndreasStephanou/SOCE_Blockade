@@ -1,0 +1,3 @@
+names,scores,logfoldchanges,pvals,pvals_adj,Cell type,Regulation
+CYP1B1,24.506475,1.2391772,1.2600616654352367e-132,2.083763976130251e-128,CD14+ Monocytes,upregulated
+THBS1,20.500748,1.0870049,2.120085777582658e-93,1.7529929251942206e-89,CD14+ Monocytes,upregulated
