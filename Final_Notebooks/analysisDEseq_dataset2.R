@@ -3,8 +3,7 @@ library(readr); library(here);
 library(DESeq2); library(reshape2); library("vsn")
 library(ggplot2); library(ggpubr); library(ggrepel); library(RColorBrewer); library(patchwork)
 
-setwd("/fs/cbsuvlaminck3/workdir/mm2937/ActivatedPBMC/")
-
+setwd("/workdir/mm2937/ActivatedPBMC/")
 
 counts2 <- read.csv("Unstranded_CountMatrix2_STAR_GRCh38.csv", sep = ",", header = TRUE, row.names = 1)
 # counts <- read.csv("Unstranded_CountMatrix_removeDupl.csv", sep = ",", header = TRUE, row.names = 1)
@@ -448,213 +447,554 @@ ggplot(d, aes(x=Condition.of.Experiment, y=count, shape = DonorID)) + geom_point
 table(d$Condition.of.Experiment)
 
 
-condition_colors = brewer.pal(name = "Dark2", n = length(unique(annotation_df$Condition.of.Experiment)))
+condition_colors = brewer.pal(name = "Dark2", n = length(unique(d$Condition.of.Experiment)))
 condition_colors = c('#E78AC3','#FFD92F','#377EB8','#7570B3','#E41A1C','#4DAF4A')
 condition_levels = c("PBMCs (Control)", "PBMCs + BTP2", "PBMCs + CM4620", "PBMCs + PHA", "PBMCs + PHA + BTP2", "PBMCs + PHA + CM4620")
 names(condition_colors) <- condition_levels
 
-gene_name = c("ORAI1")
-d <- plotCounts(dataset_subset, gene=gene_name, intgroup=c("Condition.of.Experiment", "DonorID"), returnData = T)
-d$Condition.of.Experiment <- factor(d$Condition.of.Experiment, levels = condition_levels)
-table(d$Condition.of.Experiment)
-p1 <- ggplot(d, aes(x=Condition.of.Experiment, y=count, shape = DonorID, color=Condition.of.Experiment)) + geom_point(position=position_jitter(w=0.0,h=0), size = 1) + scale_y_log10() + ylab(gene_name)  & theme_classic(base_size = 6) & theme(plot.margin  = margin(3,3,3,3), axis.text = element_text(color = "black"), axis.text.x = element_text(angle = 45, hjust = 1.0), legend.position = "none") & scale_color_manual(values = condition_colors)
-p1
+# --- Libraries ---
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(ggpubr)
+library(scales)
 
-gene_name = c("ORAI2")
-d <- plotCounts(dataset_subset, gene=gene_name, intgroup=c("Condition.of.Experiment", "DonorID"), returnData = T)
-d$Condition.of.Experiment <- factor(d$Condition.of.Experiment, levels = condition_levels)
-table(d$Condition.of.Experiment)
-p2 <- ggplot(d, aes(x=Condition.of.Experiment, y=count, shape = DonorID, color=Condition.of.Experiment)) + geom_point(position=position_jitter(w=0.0,h=0), size = 1) + scale_y_log10() + ylab(gene_name)  & theme_classic(base_size = 6) & theme(plot.margin  = margin(3,3,3,3), axis.text = element_text(color = "black"), axis.text.x = element_text(angle = 45, hjust = 1.0), legend.position = "none") & scale_color_manual(values = condition_colors)
-p2
+# --- Inputs you already have / want ---
+genes_keep <- c("CD3E", "CD4", "CD8A",
+                "CD27","CD28",
+                "ITGAE",
+                "IL2","IL2RA",
+                "IFNG","CXCL9","CXCL10","CXCR3",
+                "PRF1","GZMB",
+                "TGFB1","IL10","FOXP3","CTLA4")
 
+condition_levels <- c(
+  "PBMCs (Control)",
+  "PBMCs + BTP2",
+  "PBMCs + CM4620",
+  "PBMCs + PHA",
+  "PBMCs + PHA + BTP2",
+  "PBMCs + PHA + CM4620"
+)
 
-gene_name = c("ORAI3")
-d <- plotCounts(dataset_subset, gene=gene_name, intgroup=c("Condition.of.Experiment", "DonorID"), returnData = T)
-d$Condition.of.Experiment <- factor(d$Condition.of.Experiment, levels = condition_levels)
-table(d$Condition.of.Experiment)
-p3 <- ggplot(d, aes(x=Condition.of.Experiment, y=count, shape = DonorID, color=Condition.of.Experiment)) + geom_point(position=position_jitter(w=0.0,h=0), size = 1) + scale_y_log10() + ylab(gene_name)  & theme_classic(base_size = 6) & theme(plot.margin  = margin(3,3,3,3), axis.text = element_text(color = "black"), axis.text.x = element_text(angle = 45, hjust = 1.0), legend.position = "none") & scale_color_manual(values = condition_colors)
-p3
+condition_colors <- c(
+  "PBMCs (Control)"       = "#E78AC3",
+  "PBMCs + BTP2"          = "#FFD92F",
+  "PBMCs + CM4620"        = "#377EB8",
+  "PBMCs + PHA"           = "#7570B3",
+  "PBMCs + PHA + BTP2"    = "#E41A1C",
+  "PBMCs + PHA + CM4620"  = "#4DAF4A"
+)
 
-gene_name = c("STIM1")
-d <- plotCounts(dataset_subset, gene=gene_name, intgroup=c("Condition.of.Experiment", "DonorID"), returnData = T)
-d$Condition.of.Experiment <- factor(d$Condition.of.Experiment, levels =condition_levels)
-table(d$Condition.of.Experiment)
-p4 <- ggplot(d, aes(x=Condition.of.Experiment, y=count, shape = DonorID, color=Condition.of.Experiment)) + geom_point(position=position_jitter(w=0.0,h=0), size = 1) + scale_y_log10() + ylab(gene_name)  & theme_classic(base_size = 6) & theme(plot.margin  = margin(3,3,3,3), axis.text = element_text(color = "black"), axis.text.x = element_text(angle = 45, hjust = 1.0), legend.position = "none") & scale_color_manual(values = condition_colors)
-p4
+comp_use <- list(
+  c("PBMCs (Control)", "PBMCs + BTP2"),
+  c("PBMCs (Control)", "PBMCs + CM4620"),
+  c("PBMCs (Control)", "PBMCs + PHA"),
+  c("PBMCs + PHA", "PBMCs + PHA + BTP2"),
+  c("PBMCs + PHA", "PBMCs + PHA + CM4620")
+)
+# --- 1) Get counts for all genes ---
+# 1) Collect counts for all genes
+get_counts_one_gene <- function(g) {
+  d <- plotCounts(
+    dataset_subset,
+    gene = g,
+    intgroup = c("Condition.of.Experiment", "DonorID"),
+    returnData = TRUE
+  )
+  d$Gene <- g
+  d
+}
 
-gene_name = c("STIM2")
-d <- plotCounts(dataset_subset, gene=gene_name, intgroup=c("Condition.of.Experiment", "DonorID"), returnData = T)
-d$Condition.of.Experiment <- factor(d$Condition.of.Experiment, levels = condition_levels)
-table(d$Condition.of.Experiment)
-p5 <- ggplot(d, aes(x=Condition.of.Experiment, y=count, shape = DonorID, color=Condition.of.Experiment)) + geom_point(position=position_jitter(w=0.0,h=0), size = 1) + scale_y_log10() + ylab(gene_name)  & theme_classic(base_size = 6) & theme(plot.margin  = margin(3,3,3,3), axis.text = element_text(color = "black"), axis.text.x = element_text(angle = 45, hjust = 1.0), legend.position = "none") & scale_color_manual(values = condition_colors)
-p5
+df_all <- bind_rows(lapply(genes_keep, get_counts_one_gene)) %>%
+  mutate(
+    Gene = factor(Gene, levels = genes_keep),
+    Condition.of.Experiment = factor(Condition.of.Experiment, levels = condition_levels),
+    count_plot = ifelse(count <= 0, NA_real_, count)  # log-safe
+  )
 
+# 2) Stats per gene (unpaired Wilcoxon on donor-level summaries), BH per gene
+agg_method <- "median"  # or "mean"
+summ_fun <- if (agg_method == "median") median else mean
 
-pdf("./plots2/Orai_Stim_plots_arr2.pdf", width = 5, height = 1.5)
-((p4 | p5 | p1 | p2 | p3)) & theme(axis.text.x =  element_blank(), axis.title.x = element_blank()) 
+get_stats_for_gene <- function(gdat) {
+  # donor-level summary (median or mean as you set above)
+  d_sum <- gdat %>%
+    dplyr::group_by(DonorID, Condition.of.Experiment) %>%
+    dplyr::summarise(value = summ_fun(count, na.rm = TRUE), .groups = "drop")
+  
+  out <- lapply(comp_use, function(pr) {
+    # pivot to ensure rows are matched by DonorID and both conditions are present
+    wide <- d_sum %>%
+      dplyr::filter(Condition.of.Experiment %in% pr) %>%
+      tidyr::pivot_wider(
+        id_cols   = DonorID,
+        names_from = Condition.of.Experiment,
+        values_from = value
+      ) %>%
+      # keep only donors with both values
+      dplyr::filter(is.finite(.data[[pr[1]]]), is.finite(.data[[pr[2]]]))
+    
+    if (nrow(wide) < 2L) {  # need at least 2 pairs for a sensible paired test
+      return(tibble(group1 = pr[1], group2 = pr[2], p = NA_real_))
+    }
+    
+    x <- wide[[pr[1]]]
+    y <- wide[[pr[2]]]
+    diffs <- x - y
+    
+    # exact Wilcoxon is not available with ties/zeros; detect and fall back
+    has_ties_or_zeros <- any(diffs == 0) || (length(unique(abs(diffs))) < length(diffs))
+    exact_flag <- if (has_ties_or_zeros) FALSE else TRUE
+    
+    pval <- tryCatch(
+      stats::wilcox.test(x, y, paired = TRUE, exact = exact_flag,
+                         conf.int = TRUE, conf.level = 0.95)$p.value,
+      error = function(e) NA_real_
+    )
+    tibble(group1 = pr[1], group2 = pr[2], p = pval)
+  })
+  
+  stats <- dplyr::bind_rows(out)
+  stats$p_adj <- dplyr::if_else(is.finite(stats$p), p.adjust(stats$p, method = "BH"), NA_real_)
+  stats$p_label <- dplyr::case_when(
+    is.na(stats$p_adj)   ~ "n/a",
+    stats$p_adj < 1e-4   ~ "****",
+    stats$p_adj < 1e-3   ~ "***",
+    stats$p_adj < 1e-2   ~ "**",
+    stats$p_adj < 5e-2   ~ "*",
+    TRUE                 ~ "ns"
+  )
+  stats
+}
+
+stats_all <- df_all %>%
+  dplyr::group_by(Gene) %>%
+  dplyr::group_modify(~ get_stats_for_gene(.x)) %>%
+  dplyr::ungroup()
+
+stats_all
+# --- 3) Measure panel height in inches from a base plot ---
+p0 <- ggplot(df_all, aes(x = Condition.of.Experiment, y = count_plot,
+                         color = Condition.of.Experiment)) +
+  geom_point(aes(shape = DonorID),
+             position = position_jitter(width = 0.12, height = 0),
+             size = 2, alpha = 1) +
+  facet_wrap(~ Gene, scales = "free_y", ncol = 6) +
+  scale_color_manual(values = condition_colors, drop = FALSE) +
+  coord_trans(y = "log10", clip = "off") +
+  scale_y_continuous(
+    breaks = c(10,50,100,500,1000,5000,10000,50000,100000,500000,1000000),
+    labels = scales::label_number(accuracy = 1, big.mark = ","),
+    expand = expansion(mult = c(0.02, 0.02))
+  ) +
+  theme_classic(base_size = 8) +
+  theme(
+    panel.border  = element_rect(color = "black", fill = NA, linewidth = 0.25),
+    axis.line.x   = element_blank(),
+    axis.text.x   = element_blank(),
+    axis.ticks.x  = element_blank(),
+    axis.title.x  = element_blank(),
+    legend.position = "bottom",
+    strip.background = element_rect(fill = "grey95", color = NA),
+    plot.margin = margin(4, 6, 4, 6)
+  )
+
+gt <- ggplotGrob(p0)
+panel_rows <- unique(gt$layout$t[grepl("^panel", gt$layout$name)])
+panel_height_in <- convertHeight(gt$heights[panel_rows[1]], "in", valueOnly = TRUE)
+panel_height_in <- ifelse(is.finite(panel_height_in) && panel_height_in > 0, panel_height_in, 2) # fallback
+
+# --- 4) Robust per-facet ranges + convert 1 inch to log-data units ---
+# Guards: ensure y_min < y_max and log_span > 0; supply fallbacks if degenerate
+y_range <- df_all %>%
+  dplyr::group_by(Gene) %>%
+  dplyr::summarise(
+    y_min_raw = suppressWarnings(min(count_plot[count_plot > 0], na.rm = TRUE)),
+    y_max_raw = suppressWarnings(max(count_plot, na.rm = TRUE)),
+    .groups = "drop"
+  ) %>%
+  dplyr::mutate(
+    y_max = dplyr::if_else(is.finite(y_max_raw) & y_max_raw > 0, y_max_raw, 1),
+    y_min = dplyr::if_else(is.finite(y_min_raw) & y_min_raw > 0 & y_min_raw < y_max,
+                           y_min_raw, pmax(y_max/3, 1e-6)),
+    log_span = pmax(log10(y_max) - log10(y_min), 1e-3),  # never zero
+    # 1 inch in data-log units; enforce a minimum band height (e.g., 0.25 decades)
+    delta_log_1in = pmax((1 / panel_height_in) * log_span, 0.25),
+    log_cap  = log10(y_max),
+    log_top  = log_cap + delta_log_1in
+  )
+
+# --- 5) Bracket positions: evenly spaced across the 1-inch band with padding ---
+valid_x <- levels(df_all$Condition.of.Experiment)
+
+pad_top_in <- 0.05   # keep 0.05 in below the top of the band
+pad_bot_in <- 0.05   # keep 0.05 in above the data max
+stats_all_draw <- stats_all %>%
+  dplyr::filter(is.finite(p_adj), group1 %in% valid_x, group2 %in% valid_x) %>%
+  dplyr::left_join(y_range, by = "Gene") %>%
+  dplyr::group_by(Gene) %>%
+  dplyr::mutate(
+    n_br = dplyr::n(),
+    idx  = dplyr::row_number(),
+    # convert inch paddings to log units using the same inches?log mapping
+    log_pad_top = (pad_top_in / panel_height_in) * log_span,
+    log_pad_bot = (pad_bot_in / panel_height_in) * log_span,
+    band_start  = log_cap + log_pad_bot,
+    band_end    = log_top - log_pad_top,
+    # ensure the band has width; if not, widen to a minimal 0.1 decade
+    band_end    = dplyr::if_else(band_end <= band_start, band_start + 0.1, band_end),
+    frac        = dplyr::if_else(n_br == 1, 0.5, (idx - 1) / pmax(n_br - 1, 1)),
+    y.position  = 10^(band_start + frac * (band_end - band_start))
+  ) %>%
+  dplyr::ungroup() %>%
+  dplyr::filter(is.finite(y.position) & y.position > 0)
+
+# --- 6) Per-facet upper limits: just above the top bracket (with tiny pad) ---
+df_limits <- stats_all_draw %>%
+  dplyr::group_by(Gene) %>%
+  dplyr::summarise(y_upper = max(y.position, na.rm = TRUE) * 1.05, .groups = "drop") %>%
+  dplyr::right_join(y_range, by = "Gene") %>%
+  dplyr::mutate(
+    # if a facet had no valid brackets, use top of the 1-inch band
+    y_upper = dplyr::if_else(is.finite(y_upper), y_upper, 10^log_top)
+  ) %>%
+  dplyr::select(Gene, y_upper)
+
+# --- 7) Final plot (jitter-only) with per-facet y limits via geom_blank ---
+p <- ggplot(df_all, aes(x = Condition.of.Experiment, y = count_plot,
+                        color = Condition.of.Experiment)) +
+  geom_blank(data = df_limits, aes(y = y_upper), inherit.aes = FALSE) +
+  geom_point(aes(shape = DonorID),
+             position = position_jitter(width = 0.12, height = 0),
+             size = 1, alpha = 1) +
+  facet_wrap(~ Gene, scales = "free_y", ncol = 6) +
+  scale_color_manual(values = condition_colors, drop = FALSE) +
+  coord_trans(y = "log10", clip = "off") +
+  scale_y_continuous(
+    breaks = c(10,50,100,500,1000,5000,10000,50000,100000,500000,1000000),
+    labels = scales::label_number(accuracy = 1, big.mark = ","),
+    expand = expansion(mult = c(0.02, 0.02))
+  ) +
+  ggpubr::stat_pvalue_manual(
+    stats_all_draw,
+    label = "p_label",
+    xmin = "group1", xmax = "group2",
+    y.position = "y.position",
+    tip.length = 0, size = 2
+  ) +
+  theme_classic(base_size = 6) +   # set default text size to 6
+  theme(
+    panel.border  = element_rect(color = "black", fill = NA, linewidth = 0.25),
+    axis.line.x   = element_blank(),
+    axis.text.x   = element_blank(),
+    axis.ticks.x  = element_blank(),
+    axis.title.x  = element_blank(),
+    legend.position = "bottom",
+    strip.background = element_rect(fill = "grey95", color = NA),
+    strip.text = element_text(size = 6),
+    legend.text = element_text(size = 6),
+    legend.title = element_text(size = 6),
+    plot.title = element_text(size = 6),
+    plot.margin = margin(4, 6, 4, 6)
+  ) +
+  labs(y = "bulk RNA count (log10)")
+
+p
+
+### ONLY PLOT/ NO STATS
+
+p <- ggplot(df_all, aes(x = Condition.of.Experiment, y = count_plot,
+                        color = Condition.of.Experiment)) +
+  geom_point(aes(shape = DonorID),
+             position = position_jitter(width = 0.12, height = 0),
+             size = 1, alpha = 1) +
+  facet_wrap(~ Gene, scales = "free_y", ncol = 6) +
+  scale_color_manual(values = condition_colors, drop = FALSE) +
+  coord_trans(y = "log10", clip = "off") +
+  scale_y_continuous(
+    breaks = c(10,50,100,500,1000,5000,10000,50000,100000,500000,1000000),
+    labels = scales::label_number(accuracy = 1, big.mark = ","),
+    expand = expansion(mult = c(0.1, 0.1))
+  ) +
+  theme_classic(base_size = 6) +
+  theme(
+    panel.border  = element_rect(color = "black", fill = NA, linewidth = 0.25),
+    axis.line.x   = element_blank(),
+    axis.text.x   = element_blank(),
+    axis.ticks.x  = element_blank(),
+    axis.title.x  = element_blank(),
+    legend.position = "none",
+    strip.background = element_rect(fill = "grey95", color = NA),
+    strip.text = element_text(size = 6),
+    legend.text = element_text(size = 6),
+    legend.title = element_text(size = 6),
+    plot.title = element_text(size = 6),
+    plot.margin = margin(4, 6, 4, 6)
+  ) +
+  labs(y = "")
+
+p
+
+pdf("./plots2/Bulk_RNA_all_NoStats.pdf", width = 6, height = 3.5)
+(p)& theme(axis.text.x =  element_blank(), axis.title.x = element_blank()) 
 dev.off()
 
 
-gene_name = c("IL2")
-d <- plotCounts(dataset_subset, gene=gene_name, intgroup=c("Condition.of.Experiment", "DonorID"), returnData = T)
-d$Condition.of.Experiment <- factor(d$Condition.of.Experiment, levels = condition_levels)
-table(d$Condition.of.Experiment)
-p1 <- ggplot(d, aes(x=Condition.of.Experiment, y=count, shape = DonorID, color=Condition.of.Experiment)) + geom_point(position=position_jitter(w=0.0,h=0), size = 1) + scale_y_log10() + ylab(gene_name)  & theme_classic(base_size = 6) & theme(plot.margin  = margin(3,3,3,3), axis.text = element_text(color = "black"), axis.text.x = element_text(angle = 45, hjust = 1.0), legend.position = "none") & scale_color_manual(values = condition_colors)
-p1
+###################################################################################################
+# Load qPCR CNVs and create plots
 
-gene_name = c("IL2RA")
-d <- plotCounts(dataset_subset, gene=gene_name, intgroup=c("Condition.of.Experiment", "DonorID"), returnData = T)
-d$Condition.of.Experiment <- factor(d$Condition.of.Experiment, levels = condition_levels)
-table(d$Condition.of.Experiment)
-p2 <- ggplot(d, aes(x=Condition.of.Experiment, y=count, shape = DonorID, color=Condition.of.Experiment)) + geom_point(position=position_jitter(w=0.0,h=0), size = 1) + scale_y_log10() + ylab(gene_name)  & theme_classic(base_size = 6) & theme(plot.margin  = margin(3,3,3,3), axis.text = element_text(color = "black"), axis.text.x = element_text(angle = 45, hjust = 1.0), legend.position = "none") & scale_color_manual(values = condition_colors)
-p2
+qPCR_cnv = read_csv('qPCR/CNVs_qPCR.csv')
 
+library(tidyr)
+df_long <- qPCR_cnv %>%
+  pivot_longer(
+    cols = starts_with("EXPT"),
+    names_to = "DonorID",
+    values_to = "count"
+  ) %>%
+  mutate(
+    DonorID = recode(DonorID,
+                     "EXPT 9"  = "Donor1",
+                     "EXPT 10" = "Donor2",
+                     "EXPT 11" = "Donor3",
+                     "EXPT 12" = "Donor4"),
+    Condition.of.Experiment = recode(Condition,
+                                     "PBMC"                = "PBMCs (Control)",
+                                     "PBMC + BTP2"         = "PBMCs + BTP2",
+                                     "PBMC + CM4620"       = "PBMCs + CM4620",
+                                     "PBMC + PHA"          = "PBMCs + PHA",
+                                     "PBMC + PHA + BTP2"   = "PBMCs + PHA + BTP2",
+                                     "PBMC + PHA + CM4620" = "PBMCs + PHA + CM4620"
+    )
+  ) %>%
+  select(Gene, count, Condition.of.Experiment, DonorID)
 
-pdf("./plots2/il2_il2ra_plots.pdf", width = 2, height = 1.5)
-(p1 | p2)& theme(axis.text.x =  element_blank(), axis.title.x = element_blank()) 
-dev.off()
+# Needed packages
+library(dplyr)
+library(ggplot2)
+library(ggpubr)   # for stat_pvalue_manual
+library(rstatix)  # for wilcox_test / add_xy_position
 
-gene_name = c("CD27")
-d <- plotCounts(dataset_subset, gene=gene_name, intgroup=c("Condition.of.Experiment", "DonorID"), returnData = T)
-d$Condition.of.Experiment <- factor(d$Condition.of.Experiment, levels = condition_levels)
-table(d$Condition.of.Experiment)
-p1 <- ggplot(d, aes(x=Condition.of.Experiment, y=count, shape = DonorID, color=Condition.of.Experiment)) + geom_point(position=position_jitter(w=0.0,h=0), size = 1) + scale_y_log10() + ylab(gene_name)  & theme_classic(base_size = 6) & theme(plot.margin  = margin(3,3,3,3), axis.text = element_text(color = "black"), axis.text.x = element_text(angle = 45, hjust = 1.0), legend.position = "none") & scale_color_manual(values = condition_colors)
-p1
+# Defaults you asked for
+condition_levels <- c(
+  "PBMCs (Control)",
+  "PBMCs + BTP2",
+  "PBMCs + CM4620",
+  "PBMCs + PHA",
+  "PBMCs + PHA + BTP2",
+  "PBMCs + PHA + CM4620"
+)
 
-gene_name = c("CD28")
-d <- plotCounts(dataset_subset, gene=gene_name, intgroup=c("Condition.of.Experiment", "DonorID"), returnData = T)
-d$Condition.of.Experiment <- factor(d$Condition.of.Experiment, levels = condition_levels)
-table(d$Condition.of.Experiment)
-p2 <- ggplot(d, aes(x=Condition.of.Experiment, y=count, shape = DonorID, color=Condition.of.Experiment)) + geom_point(position=position_jitter(w=0.0,h=0), size = 1) + scale_y_log10() + ylab(gene_name)  & theme_classic(base_size = 6) & theme(plot.margin  = margin(3,3,3,3), axis.text = element_text(color = "black"), axis.text.x = element_text(angle = 45, hjust = 1.0), legend.position = "none") & scale_color_manual(values = condition_colors)
-p2
+comp_use <- list(
+  c("PBMCs + PHA", "PBMCs + PHA + BTP2"),
+  c("PBMCs + PHA", "PBMCs + PHA + CM4620"),
+  c("PBMCs + PHA + BTP2", "PBMCs + PHA + CM4620"),
+  c("PBMCs (Control)", "PBMCs + BTP2"),
+  c("PBMCs (Control)", "PBMCs + CM4620"),
+  c("PBMCs (Control)", "PBMCs + PHA")
+)
 
+condition_colors <- c('#E78AC3','#FFD92F','#377EB8','#7570B3','#E41A1C','#4DAF4A')
+names(condition_colors) <- condition_levels
 
-pdf("./plots2/cd27_cd28_plots.pdf", width = 2, height = 1.5)
-(p1 | p2)& theme(axis.text.x =  element_blank(), axis.title.x = element_blank()) 
-dev.off()
+library(scales)
 
-gene_name = c("PRF1")
-d <- plotCounts(dataset_subset, gene=gene_name, intgroup=c("Condition.of.Experiment", "DonorID"), returnData = T)
-d$Condition.of.Experiment <- factor(d$Condition.of.Experiment, levels = condition_levels)
-table(d$Condition.of.Experiment)
-p1 <- ggplot(d, aes(x=Condition.of.Experiment, y=count, shape = DonorID, color=Condition.of.Experiment)) + geom_point(position=position_jitter(w=0.0,h=0), size = 1) + scale_y_log10() + ylab(gene_name)  & theme_classic(base_size = 6) & theme(plot.margin  = margin(3,3,3,3), axis.text = element_text(color = "black"), axis.text.x = element_text(angle = 45, hjust = 1.0), legend.position = "none") & scale_color_manual(values = condition_colors)
-p1
+# Choose your genes and order them
+genes_keep <- c("CD3E", "CD4", "CD8A",
+                "CD27","CD28",
+                "ITGAE",
+                "IL2","CD25",
+                "IFNG","CXCL9","CXCL10","CXCR3",
+                "PRF1","GZMB",
+                "TGFB1","IL10","FOXP3","CTLA4")   # put them in desired order
 
-gene_name = c("GZMB")
-d <- plotCounts(dataset_subset, gene=gene_name, intgroup=c("Condition.of.Experiment", "DonorID"), returnData = T)
-d$Condition.of.Experiment <- factor(d$Condition.of.Experiment, levels = condition_levels)
-table(d$Condition.of.Experiment)
-p2 <- ggplot(d, aes(x=Condition.of.Experiment, y=count, shape = DonorID, color=Condition.of.Experiment)) + geom_point(position=position_jitter(w=0.0,h=0), size = 1) + scale_y_log10() + ylab(gene_name)  & theme_classic(base_size = 6) & theme(plot.margin  = margin(3,3,3,3), axis.text = element_text(color = "black"), axis.text.x = element_text(angle = 45, hjust = 1.0), legend.position = "none") & scale_color_manual(values = condition_colors)
-p2
+# Make sure we use dplyr verbs explicitly (avoids masking)
+library(dplyr)
 
-pdf("./plots2/prf1_gzma_cd96_plots.pdf", width = 2.0, height = 1.5)
-(p1 | p2)& theme(axis.text.x =  element_blank(), axis.title.x = element_blank()) 
-dev.off()
+# 0) Ensure factors align to your palette
+condition_levels <- names(condition_colors)
+df_sub <- df_long %>%
+  dplyr::filter(Gene %in% genes_keep) %>%
+  dplyr::mutate(
+    Gene = factor(Gene, levels = genes_keep),
+    Condition.of.Experiment = factor(Condition.of.Experiment, levels = condition_levels)
+  )
 
-gene_name = c("IFNG")
-d <- plotCounts(dataset_subset, gene=gene_name, intgroup=c("Condition.of.Experiment", "DonorID"), returnData = T)
-d$Condition.of.Experiment <- factor(d$Condition.of.Experiment, levels = condition_levels)
-table(d$Condition.of.Experiment)
-p0 <- ggplot(d, aes(x=Condition.of.Experiment, y=count, shape = DonorID, color=Condition.of.Experiment)) + geom_point(position=position_jitter(w=0.0,h=0), size = 1) + scale_y_log10() + ylab(gene_name)  & theme_classic(base_size = 6) & theme(plot.margin  = margin(3,3,3,3), axis.text = element_text(color = "black"), axis.text.x = element_text(angle = 45, hjust = 1.0), legend.position = "none") & scale_color_manual(values = condition_colors)
-p0
+# 1) Count finite rows per gene (avoid masked count(); do it explicitly)
+df_gene_counts <- df_sub %>%
+  dplyr::group_by(Gene) %>%
+  dplyr::summarise(n_finite = sum(is.finite(count)), .groups = "drop")
 
-gene_name = c("CXCL9")
-d <- plotCounts(dataset_subset, gene=gene_name, intgroup=c("Condition.of.Experiment", "DonorID"), returnData = T)
-d$Condition.of.Experiment <- factor(d$Condition.of.Experiment, levels =condition_levels)
-table(d$Condition.of.Experiment)
-p1 <- ggplot(d, aes(x=Condition.of.Experiment, y=count, shape = DonorID, color=Condition.of.Experiment)) + geom_point(position=position_jitter(w=0.0,h=0), size = 1) + scale_y_log10() + ylab(gene_name)  & theme_classic(base_size = 6) & theme(plot.margin  = margin(3,3,3,3), axis.text = element_text(color = "black"), axis.text.x = element_text(angle = 45, hjust = 1.0), legend.position = "none") & scale_color_manual(values = condition_colors)
-p1
+# 2) Drop genes with zero finite rows, then drop unused facet levels
+empty_genes <- as.character(df_gene_counts$Gene[df_gene_counts$n_finite == 0])
+if (length(empty_genes)) {
+  warning("Dropping empty genes (no finite counts): ", paste(empty_genes, collapse = ", "))
+  df_sub <- df_sub %>% dplyr::filter(!(Gene %in% empty_genes))
+}
+df_sub <- droplevels(df_sub)
 
-gene_name = c("CXCL10")
-d <- plotCounts(dataset_subset, gene=gene_name, intgroup=c("Condition.of.Experiment", "DonorID"), returnData = T)
-d$Condition.of.Experiment <- factor(d$Condition.of.Experiment, levels = condition_levels)
-table(d$Condition.of.Experiment)
-p2 <- ggplot(d, aes(x=Condition.of.Experiment, y=count, shape = DonorID, color=Condition.of.Experiment)) + geom_point(position=position_jitter(w=0.0,h=0), size = 1) + scale_y_log10() + ylab(gene_name)  & theme_classic(base_size = 6) & theme(plot.margin  = margin(3,3,3,3), axis.text = element_text(color = "black"), axis.text.x = element_text(angle = 45, hjust = 1.0), legend.position = "none") & scale_color_manual(values = condition_colors)
-p2
+# 3) Recompute y caps & limits only for genes that remain
+y_caps <- df_sub %>%
+  dplyr::group_by(Gene) %>%
+  dplyr::summarise(y_cap = suppressWarnings(max(count, na.rm = TRUE)), .groups = "drop") %>%
+  dplyr::mutate(y_cap = ifelse(is.finite(y_cap), y_cap, 0))
 
-gene_name = c("CXCR3")
-d <- plotCounts(dataset_subset, gene=gene_name, intgroup=c("Condition.of.Experiment", "DonorID"), returnData = T)
-d$Condition.of.Experiment <- factor(d$Condition.of.Experiment, levels = condition_levels)
-table(d$Condition.of.Experiment)
-p3 <- ggplot(d, aes(x=Condition.of.Experiment, y=count, shape = DonorID, color=Condition.of.Experiment)) + geom_point(position=position_jitter(w=0.0,h=0), size = 1) + scale_y_log10() + ylab(gene_name)  & theme_classic(base_size = 6) & theme(plot.margin  = margin(3,3,3,3), axis.text = element_text(color = "black"), axis.text.x = element_text(angle = 45, hjust = 1.0), legend.position = "none") & scale_color_manual(values = condition_colors)
-p3
+band_frac <- 0.50  # +50% over max
+min_band  <- 25    # absolute min band height (tune to your scale)
+pad_top_frac <- 0.05
+pad_bot_frac <- 0.05
 
-pdf("./plots2/cxcl9_10.pdf", width = 4, height = 1.5)
-(p0 | p1 | p2 | p3)& theme(axis.text.x =  element_blank(), axis.title.x = element_blank()) 
-dev.off()
+df_limits <- y_caps %>%
+  dplyr::mutate(
+    band    = pmax(y_cap * band_frac, min_band),
+    y_upper = y_cap + band
+  )
 
-gene_name = c("CD3E")
-d <- plotCounts(dataset_subset, gene=gene_name, intgroup=c("Condition.of.Experiment", "DonorID"), returnData = T)
-d$Condition.of.Experiment <- factor(d$Condition.of.Experiment, levels = condition_levels)
-table(d$Condition.of.Experiment)
-p1 <- ggplot(d, aes(x=Condition.of.Experiment, y=count, shape = DonorID, color=Condition.of.Experiment)) + geom_point(position=position_jitter(w=0.0,h=0), size = 1) + scale_y_log10() + ylab(gene_name)  & theme_classic(base_size = 6) & theme(plot.margin  = margin(3,3,3,3), axis.text = element_text(color = "black"), axis.text.x = element_text(angle = 45, hjust = 1.0), legend.position = "none") & scale_color_manual(values = condition_colors)
-p1
+# 4) (Re)compute stats and bracket positions for the surviving genes
+#    ? if you already have stats_all, filter it to kept genes; else compute now.
+get_stats <- function(gene_df, comps) {
+  gene_df <- gene_df %>% dplyr::filter(is.finite(count))
+  out <- lapply(comps, function(cc) {
+    sub <- gene_df %>% dplyr::filter(Condition.of.Experiment %in% cc)
+    grp_present <- table(sub$Condition.of.Experiment)
+    if (length(grp_present) < 2 || any(grp_present[cc] < 1)) {
+      return(tibble(group1 = cc[1], group2 = cc[2], p = NA_real_))
+    }
+    pval <- tryCatch(
+      stats::wilcox.test(count ~ Condition.of.Experiment, data = sub, paired = FALSE, exact = FALSE)$p.value,
+      error = function(e) NA_real_
+    )
+    tibble(group1 = cc[1], group2 = cc[2], p = pval)
+  })
+  stats <- dplyr::bind_rows(out) %>%
+    dplyr::mutate(
+      p_adj   = ifelse(is.finite(p), p.adjust(p, method = "BH"), NA_real_),
+      p_label = dplyr::case_when(
+        is.na(p_adj)   ~ "n/a",
+        p_adj < 1e-4   ~ "****",
+        p_adj < 1e-3   ~ "***",
+        p_adj < 1e-2   ~ "**",
+        p_adj < 5e-2   ~ "*",
+        TRUE           ~ "ns"
+      )
+    )
+  stats
+}
 
+stats_all <- df_sub %>%
+  dplyr::group_by(Gene) %>%
+  dplyr::group_modify(~ get_stats(.x, comp_use)) %>%
+  dplyr::ungroup()
 
-gene_name = c("CD4")
-d <- plotCounts(dataset_subset, gene=gene_name, intgroup=c("Condition.of.Experiment", "DonorID"), returnData = T)
-d$Condition.of.Experiment <- factor(d$Condition.of.Experiment, levels = condition_levels)
-table(d$Condition.of.Experiment)
-p2 <- ggplot(d, aes(x=Condition.of.Experiment, y=count, shape = DonorID, color=Condition.of.Experiment)) + geom_point(position=position_jitter(w=0.0,h=0), size = 1) + scale_y_log10() + ylab(gene_name)  & theme_classic(base_size = 6) & theme(plot.margin  = margin(3,3,3,3), axis.text = element_text(color = "black"), axis.text.x = element_text(angle = 45, hjust = 1.0), legend.position = "none") & scale_color_manual(values = condition_colors)
-p2
+valid_x <- condition_levels
+stats_all_draw <- stats_all %>%
+  dplyr::filter(is.finite(p_adj), group1 %in% valid_x, group2 %in% valid_x) %>%
+  dplyr::left_join(df_limits, by = "Gene") %>%
+  dplyr::group_by(Gene) %>%
+  dplyr::mutate(
+    n_br  = dplyr::n(),
+    idx   = dplyr::row_number(),
+    band0 = y_cap + band * pad_bot_frac,
+    band1 = y_cap + band * (1 - pad_top_frac),
+    # ensure non-collapsing band even if y_cap == 0
+    band0 = ifelse(band1 <= band0, y_cap + 0.4 * pmax(band, 1), band0),
+    band1 = ifelse(band1 <= band0, y_cap + 0.6 * pmax(band, 1), band1),
+    frac  = ifelse(n_br == 1, 0.5, (idx - 1) / pmax(n_br - 1, 1)),
+    y.position = band0 + frac * (band1 - band0)
+  ) %>%
+  dplyr::ungroup() %>%
+  dplyr::select(-dplyr::any_of("step.increase"))  # avoid ggpubr name collision
 
-gene_name = c("CD8A")
-d <- plotCounts(dataset_subset, gene=gene_name, intgroup=c("Condition.of.Experiment", "DonorID"), returnData = T)
-d$Condition.of.Experiment <- factor(d$Condition.of.Experiment, levels = condition_levels)
-table(d$Condition.of.Experiment)
-p3 <- ggplot(d, aes(x=Condition.of.Experiment, y=count, shape = DonorID, color=Condition.of.Experiment)) + geom_point(position=position_jitter(w=0.0,h=0), size = 1) + scale_y_log10() + ylab(gene_name)  & theme_classic(base_size = 6) & theme(plot.margin  = margin(3,3,3,3), axis.text = element_text(color = "black"), axis.text.x = element_text(angle = 45, hjust = 1.0), legend.position = "none") & scale_color_manual(values = condition_colors)
-p3
+# 5) Build the plot (jitter-only, 6 columns, text size 6)
+p <- ggplot(df_sub, aes(x = Condition.of.Experiment, y = count,
+                        color = Condition.of.Experiment)) +
+  # facet-specific top limits (no x mapping here)
+  geom_blank(data = df_limits, aes(y = y_upper), inherit.aes = FALSE) +
+  
+  geom_point(aes(shape = DonorID),
+             position = position_jitter(width = 0.12, height = 0),
+             size = 1, alpha = 0.9) +
+  
+  facet_wrap(~ Gene, scales = "free_y", ncol = 6, drop = TRUE) +
+  scale_color_manual(values = condition_colors, drop = FALSE) +
+  scale_y_continuous(
+    breaks = scales::pretty_breaks(),
+    labels = scales::number_format(accuracy = 1),
+    expand = expansion(mult = c(0.02, 0.02))
+  ) +
+  { if (nrow(stats_all_draw) > 0)
+    ggpubr::stat_pvalue_manual(
+      stats_all_draw,
+      label = "p_label",
+      xmin = "group1", xmax = "group2",
+      y.position = "y.position",
+      tip.length = 0,
+      size = 2,
+      step.increase = 0
+    )
+    else
+      NULL
+  } +
+  theme_classic(base_size = 6) +
+  theme(
+    panel.border  = element_rect(color = "black", fill = NA, linewidth = 0.25),
+    axis.line.x   = element_blank(),
+    axis.text.x   = element_blank(),
+    axis.ticks.x  = element_blank(),
+    axis.title.x  = element_blank(),
+    legend.position = "bottom",
+    strip.background = element_rect(fill = "grey95", color = NA),
+    strip.text = element_text(size = 6),
+    legend.text = element_text(size = 6),
+    legend.title = element_text(size = 6),
+    plot.title = element_text(size = 6),
+    plot.margin = margin(4, 6, 4, 6)
+  ) +
+  labs(y = "qPCR count")
 
+p
 
+### ONLY PLOT/ NO STATS
+p <- ggplot(df_sub, aes(x = Condition.of.Experiment, y = count,
+                        color = Condition.of.Experiment)) +
+  # facet-specific upper limits
+  geom_blank(data = df_limits, aes(y = y_upper), inherit.aes = FALSE) +
+  
+  # points
+  geom_point(aes(shape = DonorID),
+             position = position_jitter(width = 0.12, height = 0),
+             size = 1, alpha = 0.9) +
+  
+  facet_wrap(~ Gene, scales = "free_y", ncol = 6) +
+  scale_color_manual(values = condition_colors, drop = FALSE) +
+  coord_trans(y = "log10", clip = "off") +
+  scale_y_continuous(
+    breaks = c(10,50,100,500,1000,5000,10000,50000,100000,500000,1000000),
+    labels = scales::label_number(accuracy = 1, big.mark = ","),
+    expand = expansion(mult = c(0.1, 0.1))
+  ) +
+  theme_classic(base_size = 6) +
+  theme(
+    panel.border  = element_rect(color = "black", fill = NA, linewidth = 0.25),
+    axis.line.x   = element_blank(),
+    axis.text.x   = element_blank(),
+    axis.ticks.x  = element_blank(),
+    axis.title.x  = element_blank(),
+    legend.position = "none",
+    strip.background = element_rect(fill = "grey95", color = NA),
+    strip.text = element_text(size = 6),
+    legend.text = element_text(size = 6),
+    legend.title = element_text(size = 6),
+    plot.title = element_text(size = 6),
+    plot.margin = margin(4, 6, 4, 6)
+  ) +
+  labs(y = "")
 
-pdf("./plots2/co-receptors.pdf", width = 3, height = 1.5)
-(p1 | p2 | p3)& theme(axis.text.x =  element_blank(), axis.title.x = element_blank()) 
-dev.off()
+p
 
-
-gene_name = c("ITGAE")
-d <- plotCounts(dataset_subset, gene=gene_name, intgroup=c("Condition.of.Experiment", "DonorID"), returnData = T)
-d$Condition.of.Experiment <- factor(d$Condition.of.Experiment, levels = condition_levels)
-table(d$Condition.of.Experiment)
-p3 <- ggplot(d, aes(x=Condition.of.Experiment, y=count, shape = DonorID, color=Condition.of.Experiment)) + geom_point(position=position_jitter(w=0.0,h=0), size = 1) + scale_y_log10() + ylab(gene_name)  & theme_classic(base_size = 6) & theme(plot.margin  = margin(3,3,3,3), axis.text = element_text(color = "black"), axis.text.x = element_text(angle = 45, hjust = 1.0), legend.position = "none") & scale_color_manual(values = condition_colors)
-p3
-
-pdf("./plots2/contact.pdf", width = 2.0, height = 1.5)
-( p3 | p3) & theme(axis.text.x =  element_blank(), axis.title.x = element_blank()) 
-dev.off()
-
-
-gene_name = c("TGFB1")
-d <- plotCounts(dataset_subset, gene=gene_name, intgroup=c("Condition.of.Experiment", "DonorID"), returnData = T)
-d$Condition.of.Experiment <- factor(d$Condition.of.Experiment, levels = condition_levels)
-table(d$Condition.of.Experiment)
-p1 <- ggplot(d, aes(x=Condition.of.Experiment, y=count, shape = DonorID, color=Condition.of.Experiment)) + geom_point(position=position_jitter(w=0.0,h=0), size = 1) + scale_y_log10() + ylab(gene_name)  & theme_classic(base_size = 6) & theme(plot.margin  = margin(3,3,3,3), axis.text = element_text(color = "black"), axis.text.x = element_text(angle = 45, hjust = 1.0), legend.position = "none") & scale_color_manual(values = condition_colors)
-p1
-
-gene_name = c("IL10")
-d <- plotCounts(dataset_subset, gene=gene_name, intgroup=c("Condition.of.Experiment", "DonorID"), returnData = T)
-d$Condition.of.Experiment <- factor(d$Condition.of.Experiment, levels = condition_levels)
-table(d$Condition.of.Experiment)
-p2 <- ggplot(d, aes(x=Condition.of.Experiment, y=count, shape = DonorID, color=Condition.of.Experiment)) + geom_point(position=position_jitter(w=0.0,h=0), size = 1) + scale_y_log10() + ylab(gene_name)  & theme_classic(base_size = 6) & theme(plot.margin  = margin(3,3,3,3), axis.text = element_text(color = "black"), axis.text.x = element_text(angle = 45, hjust = 1.0), legend.position = "none") & scale_color_manual(values = condition_colors)
-p2
-
-gene_name = c("FOXP3")
-d <- plotCounts(dataset_subset, gene=gene_name, intgroup=c("Condition.of.Experiment", "DonorID"), returnData = T)
-d$Condition.of.Experiment <- factor(d$Condition.of.Experiment, levels = condition_levels)
-table(d$Condition.of.Experiment)
-p3 <- ggplot(d, aes(x=Condition.of.Experiment, y=count, shape = DonorID, color=Condition.of.Experiment)) + geom_point(position=position_jitter(w=0.0,h=0), size = 1) + scale_y_log10() + ylab(gene_name)  & theme_classic(base_size = 6) & theme(plot.margin  = margin(3,3,3,3), axis.text = element_text(color = "black"), axis.text.x = element_text(angle = 45, hjust = 1.0), legend.position = "none") & scale_color_manual(values = condition_colors)
-p3
-
-
-gene_name = c("CTLA4")
-d <- plotCounts(dataset_subset, gene=gene_name, intgroup=c("Condition.of.Experiment", "DonorID"), returnData = T)
-d$Condition.of.Experiment <- factor(d$Condition.of.Experiment, levels = condition_levels)
-table(d$Condition.of.Experiment)
-p4 <- ggplot(d, aes(x=Condition.of.Experiment, y=count, shape = DonorID, color=Condition.of.Experiment)) + geom_point(position=position_jitter(w=0.0,h=0), size = 1) + scale_y_log10() + ylab(gene_name)  & theme_classic(base_size = 6) & theme(plot.margin  = margin(3,3,3,3), axis.text = element_text(color = "black"), axis.text.x = element_text(angle = 45, hjust = 1.0), legend.position = "none") & scale_color_manual(values = condition_colors)
-p4
-
-pdf("./plots2/tolerance.pdf", width = 4, height = 1.5)
-(p1 | p2| p3 | p4)& theme(axis.text.x =  element_blank(), axis.title.x = element_blank()) 
+pdf("./plots2/qPCR_all_NoStats.pdf", width = 6, height = 3.5)
+(p)& theme(axis.text.x =  element_blank(), axis.title.x = element_blank()) 
 dev.off()
 
 
